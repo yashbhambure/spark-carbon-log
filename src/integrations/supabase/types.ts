@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notifications_daily_reminder: boolean | null
+          notifications_email: boolean | null
+          notifications_weekly_reminder: boolean | null
+          timezone: string | null
+          updated_at: string
+          user_id: string
+          weekly_target: number
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notifications_daily_reminder?: boolean | null
+          notifications_email?: boolean | null
+          notifications_weekly_reminder?: boolean | null
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+          weekly_target?: number
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notifications_daily_reminder?: boolean | null
+          notifications_email?: boolean | null
+          notifications_weekly_reminder?: boolean | null
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+          weekly_target?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
