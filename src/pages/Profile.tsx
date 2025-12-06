@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { mockUser } from '@/lib/mockData';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,12 +21,13 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Profile() {
+  const { profile, updateProfile, user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [formData, setFormData] = useState({
-    name: mockUser.name,
-    email: mockUser.email,
-    weeklyTarget: mockUser.weeklyTarget,
+    name: '',
+    email: '',
+    weeklyTarget: 50,
   });
   const [notifications, setNotifications] = useState({
     weeklyReminder: true,
@@ -34,6 +35,22 @@ export default function Profile() {
     dailyReminder: true,
   });
   const { toast } = useToast();
+
+  // Load profile data when it becomes available
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        name: profile.name || '',
+        email: profile.email || '',
+        weeklyTarget: profile.weekly_target || 50,
+      });
+      setNotifications({
+        weeklyReminder: profile.notifications_weekly_reminder ?? true,
+        emailNotifications: profile.notifications_email ?? false,
+        dailyReminder: profile.notifications_daily_reminder ?? true,
+      });
+    }
+  }, [profile]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -43,9 +60,6 @@ export default function Profile() {
     setIsSaving(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      
       // Validate form data
       if (!formData.name.trim()) {
         throw new Error('Name is required');
@@ -57,7 +71,19 @@ export default function Profile() {
         throw new Error('Weekly target must be between 1 and 1000 kg');
       }
 
-      // In a real app, this would save to the database
+      const { error } = await updateProfile({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        weekly_target: formData.weeklyTarget,
+        notifications_weekly_reminder: notifications.weeklyReminder,
+        notifications_email: notifications.emailNotifications,
+        notifications_daily_reminder: notifications.dailyReminder,
+      });
+
+      if (error) {
+        throw error;
+      }
+
       toast({
         title: "Settings saved! ✓",
         description: "Your profile has been updated successfully.",
@@ -113,9 +139,13 @@ export default function Profile() {
   const handleDeleteAccount = () => {
     toast({
       title: "Delete account",
-      description: "Account deletion requires backend connection. This feature will be available soon.",
+      description: "Account deletion requires additional confirmation. This feature will be available soon.",
       variant: "destructive",
     });
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase() || 'U';
   };
 
   return (
@@ -131,13 +161,13 @@ export default function Profile() {
       <Card className="p-6 opacity-0 animate-slide-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
         <div className="flex items-center gap-4 mb-6">
           <div className="w-20 h-20 rounded-full gradient-primary flex items-center justify-center text-3xl font-bold text-primary-foreground">
-            {formData.name.split(' ').map(n => n[0]).join('')}
+            {getInitials(formData.name)}
           </div>
           <div>
-            <h2 className="text-xl font-bold">{formData.name}</h2>
-            <p className="text-muted-foreground">{formData.email}</p>
+            <h2 className="text-xl font-bold">{formData.name || 'Your Name'}</h2>
+            <p className="text-muted-foreground">{formData.email || 'your@email.com'}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Member since {format(new Date(mockUser.createdAt), 'MMMM yyyy')}
+              Member since {profile?.created_at ? format(new Date(profile.created_at), 'MMMM yyyy') : 'Recently'}
             </p>
           </div>
         </div>
@@ -173,7 +203,7 @@ export default function Profile() {
               <Clock className="w-4 h-4" />
               Timezone
             </Label>
-            <Input id="timezone" defaultValue={mockUser.timezone} disabled />
+            <Input id="timezone" defaultValue={profile?.timezone || 'UTC'} disabled />
           </div>
 
           <div className="grid gap-2">

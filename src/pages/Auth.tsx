@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -6,27 +6,83 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Leaf, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { z } from 'zod';
+
+const authSchema = z.object({
+  email: z.string().trim().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  name: z.string().trim().min(1, { message: "Name is required" }).optional(),
+});
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const navigate = useNavigate();
+  const { signIn, signUp, user, loading } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate auth
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: isLogin ? "Welcome back! 🌱" : "Account created! 🎉",
-      description: isLogin ? "Redirecting to dashboard..." : "Let's start tracking your carbon footprint!",
-    });
-    
-    setIsLoading(false);
-    navigate('/dashboard');
+    try {
+      // Validate input
+      const validationResult = authSchema.safeParse({ 
+        email, 
+        password, 
+        name: isLogin ? undefined : name 
+      });
+      
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        throw new Error(firstError.message);
+      }
+
+      let result;
+      if (isLogin) {
+        result = await signIn(email, password);
+      } else {
+        result = await signUp(email, password, name);
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+      
+      toast({
+        title: isLogin ? "Welcome back! 🌱" : "Account created! 🎉",
+        description: isLogin ? "Redirecting to dashboard..." : "Let's start tracking your carbon footprint!",
+      });
+      
+      navigate('/dashboard');
+    } catch (error) {
+      toast({
+        title: isLogin ? "Sign in failed" : "Sign up failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
@@ -59,7 +115,9 @@ export default function Auth() {
               </Label>
               <Input 
                 id="name" 
-                placeholder="Alex Chen" 
+                placeholder="Alex Chen"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required={!isLogin}
               />
             </div>
@@ -73,7 +131,9 @@ export default function Auth() {
             <Input 
               id="email" 
               type="email" 
-              placeholder="you@university.edu" 
+              placeholder="you@university.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
@@ -86,7 +146,9 @@ export default function Auth() {
             <Input 
               id="password" 
               type="password" 
-              placeholder="••••••••" 
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>

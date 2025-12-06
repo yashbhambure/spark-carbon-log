@@ -7,7 +7,8 @@ import { ProgressBar } from '@/components/dashboard/ProgressBar';
 import { HeatMap } from '@/components/dashboard/HeatMap';
 import { RecentActivities } from '@/components/dashboard/RecentActivities';
 import { Recommendations } from '@/components/dashboard/Recommendations';
-import { mockWeeklySummary, mockUser, mockActivities } from '@/lib/mockData';
+import { mockWeeklySummary, mockActivities } from '@/lib/mockData';
+import { useAuth } from '@/hooks/useAuth';
 import { Zap, TrendingDown, Target, Calendar, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +17,10 @@ import { format } from 'date-fns';
 export default function Dashboard() {
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Get user's first name from profile, fallback to 'there'
+  const firstName = profile?.name?.split(' ')[0] || 'there';
 
   const handleDownloadReport = async () => {
     setIsDownloading(true);
@@ -27,12 +32,12 @@ export default function Dashboard() {
       // Generate report data
       const reportData = {
         generatedAt: new Date().toISOString(),
-        user: mockUser.name,
+        user: profile?.name || 'User',
         period: 'This Week',
         summary: {
           totalEmissions: mockWeeklySummary.totalEmissionKg,
           averageDaily: mockWeeklySummary.averageDailyEmissionKg,
-          weeklyTarget: mockUser.weeklyTarget,
+          weeklyTarget: profile?.weekly_target || 50,
           comparisonToPrevWeek: mockWeeklySummary.comparisonToPrevWeek,
         },
         activities: mockActivities.map(a => ({
@@ -79,7 +84,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="opacity-0 animate-fade-in" style={{ animationFillMode: 'forwards' }}>
           <h1 className="text-3xl font-bold">
-            Welcome back, <span className="text-gradient">{mockUser.name.split(' ')[0]}</span>! 👋
+            Welcome back, <span className="text-gradient">{firstName}</span>! 👋
           </h1>
           <p className="text-muted-foreground mt-1">
             Here's your carbon footprint overview for this week

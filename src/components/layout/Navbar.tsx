@@ -1,6 +1,7 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -22,7 +23,14 @@ const navItems = [
 
 export function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { signOut, profile } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -59,12 +67,15 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-2">
-            <Link to="/auth">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </Button>
-            </Link>
+            {profile?.name && (
+              <span className="text-sm text-muted-foreground">
+                {profile.name}
+              </span>
+            )}
+            <Button variant="ghost" size="sm" className="gap-2" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -82,6 +93,11 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border animate-slide-up">
             <div className="flex flex-col gap-1">
+              {profile?.name && (
+                <div className="px-3 py-2 text-sm text-muted-foreground border-b border-border mb-2">
+                  Signed in as {profile.name}
+                </div>
+              )}
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
@@ -105,12 +121,17 @@ export function Navbar() {
                   </Link>
                 );
               })}
-              <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start gap-2 text-destructive">
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </Button>
-              </Link>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-2 text-destructive"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleSignOut();
+                }}
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </Button>
             </div>
           </div>
         )}
