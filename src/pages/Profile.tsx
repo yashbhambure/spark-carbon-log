@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { mockUser } from '@/lib/mockData';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,12 +13,111 @@ import {
   Bell, 
   Shield, 
   LogIn,
-  Calendar,
-  Save
+  Save,
+  Loader2,
+  Download
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Profile() {
+  const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: mockUser.name,
+    email: mockUser.email,
+    weeklyTarget: mockUser.weeklyTarget,
+  });
+  const [notifications, setNotifications] = useState({
+    weeklyReminder: true,
+    emailNotifications: false,
+    dailyReminder: true,
+  });
+  const { toast } = useToast();
+
+  const handleInputChange = (field: string, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveChanges = async () => {
+    setIsSaving(true);
+    
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      
+      // Validate form data
+      if (!formData.name.trim()) {
+        throw new Error('Name is required');
+      }
+      if (!formData.email.includes('@')) {
+        throw new Error('Please enter a valid email');
+      }
+      if (formData.weeklyTarget < 1 || formData.weeklyTarget > 1000) {
+        throw new Error('Weekly target must be between 1 and 1000 kg');
+      }
+
+      // In a real app, this would save to the database
+      toast({
+        title: "Settings saved! ✓",
+        description: "Your profile has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "There was an error saving your settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const exportData = {
+        profile: formData,
+        notifications,
+        exportedAt: new Date().toISOString(),
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `profile-data-${format(new Date(), 'yyyy-MM-dd')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Data exported! 📁",
+        description: "Your profile data has been downloaded.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    toast({
+      title: "Delete account",
+      description: "Account deletion requires backend connection. This feature will be available soon.",
+      variant: "destructive",
+    });
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="opacity-0 animate-fade-in" style={{ animationFillMode: 'forwards' }}>
@@ -31,11 +131,11 @@ export default function Profile() {
       <Card className="p-6 opacity-0 animate-slide-up" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
         <div className="flex items-center gap-4 mb-6">
           <div className="w-20 h-20 rounded-full gradient-primary flex items-center justify-center text-3xl font-bold text-primary-foreground">
-            {mockUser.name.split(' ').map(n => n[0]).join('')}
+            {formData.name.split(' ').map(n => n[0]).join('')}
           </div>
           <div>
-            <h2 className="text-xl font-bold">{mockUser.name}</h2>
-            <p className="text-muted-foreground">{mockUser.email}</p>
+            <h2 className="text-xl font-bold">{formData.name}</h2>
+            <p className="text-muted-foreground">{formData.email}</p>
             <p className="text-sm text-muted-foreground mt-1">
               Member since {format(new Date(mockUser.createdAt), 'MMMM yyyy')}
             </p>
@@ -48,7 +148,11 @@ export default function Profile() {
               <User className="w-4 h-4" />
               Full Name
             </Label>
-            <Input id="name" defaultValue={mockUser.name} />
+            <Input 
+              id="name" 
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+            />
           </div>
 
           <div className="grid gap-2">
@@ -56,7 +160,12 @@ export default function Profile() {
               <Mail className="w-4 h-4" />
               Email
             </Label>
-            <Input id="email" type="email" defaultValue={mockUser.email} />
+            <Input 
+              id="email" 
+              type="email" 
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+            />
           </div>
 
           <div className="grid gap-2">
@@ -72,13 +181,34 @@ export default function Profile() {
               <Target className="w-4 h-4" />
               Weekly Target (kg CO₂)
             </Label>
-            <Input id="target" type="number" defaultValue={mockUser.weeklyTarget} />
+            <Input 
+              id="target" 
+              type="number" 
+              value={formData.weeklyTarget}
+              onChange={(e) => handleInputChange('weeklyTarget', Number(e.target.value))}
+              min={1}
+              max={1000}
+            />
           </div>
         </div>
 
-        <Button className="w-full mt-6" variant="hero">
-          <Save className="w-4 h-4" />
-          Save Changes
+        <Button 
+          className="w-full mt-6" 
+          variant="hero"
+          onClick={handleSaveChanges}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Save Changes
+            </>
+          )}
         </Button>
       </Card>
 
@@ -95,7 +225,10 @@ export default function Profile() {
               <p className="font-medium">Weekly Reminder</p>
               <p className="text-sm text-muted-foreground">Get reminded to check your weekly summary</p>
             </div>
-            <Switch defaultChecked />
+            <Switch 
+              checked={notifications.weeklyReminder}
+              onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, weeklyReminder: checked }))}
+            />
           </div>
 
           <div className="flex items-center justify-between">
@@ -103,7 +236,10 @@ export default function Profile() {
               <p className="font-medium">Email Notifications</p>
               <p className="text-sm text-muted-foreground">Receive weekly reports via email</p>
             </div>
-            <Switch />
+            <Switch 
+              checked={notifications.emailNotifications}
+              onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, emailNotifications: checked }))}
+            />
           </div>
 
           <div className="flex items-center justify-between">
@@ -111,7 +247,10 @@ export default function Profile() {
               <p className="font-medium">Daily Logging Reminder</p>
               <p className="text-sm text-muted-foreground">Reminder to log activities at end of day</p>
             </div>
-            <Switch defaultChecked />
+            <Switch 
+              checked={notifications.dailyReminder}
+              onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, dailyReminder: checked }))}
+            />
           </div>
         </div>
       </Card>
@@ -167,10 +306,28 @@ export default function Profile() {
           Irreversible actions - proceed with caution
         </p>
         <div className="flex gap-3">
-          <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/10">
-            Export All Data
+          <Button 
+            variant="outline" 
+            className="border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={handleExportData}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-2" />
+                Export All Data
+              </>
+            )}
           </Button>
-          <Button variant="destructive">
+          <Button 
+            variant="destructive"
+            onClick={handleDeleteAccount}
+          >
             Delete Account
           </Button>
         </div>

@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { mockActivities } from '@/lib/mockData';
 import { CATEGORY_ICONS, CATEGORY_COLORS } from '@/types/carbon';
-import { format, subDays, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Calendar, Filter, Download, Pencil, Trash2, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Calendar, Download, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function History() {
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
 
   const categories = ['transport', 'food', 'energy', 'waste', 'shopping', 'other'];
 
@@ -30,6 +31,70 @@ export default function History() {
 
   const totalEmissions = filteredActivities.reduce((sum, a) => sum + a.estimatedEmissionKgCo2, 0);
 
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate CSV content
+      const headers = ['Date', 'Time', 'Description', 'Category', 'Emission (kg CO₂)', 'Source'];
+      const rows = filteredActivities.map(activity => [
+        format(new Date(activity.datetime), 'yyyy-MM-dd'),
+        format(new Date(activity.datetime), 'HH:mm'),
+        `"${activity.description.replace(/"/g, '""')}"`,
+        activity.category,
+        activity.estimatedEmissionKgCo2.toFixed(2),
+        activity.source,
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `activity-history-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "CSV exported! 📁",
+        description: `Exported ${filteredActivities.length} activities to CSV.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleEdit = (activityId: string) => {
+    toast({
+      title: "Edit activity",
+      description: "Activity editing will be available when the backend is connected.",
+    });
+  };
+
+  const handleDelete = (activityId: string) => {
+    toast({
+      title: "Delete activity",
+      description: "Activity deletion will be available when the backend is connected.",
+      variant: "destructive",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -39,9 +104,24 @@ export default function History() {
             View and manage all your logged activities
           </p>
         </div>
-        <Button variant="secondary" className="gap-2 opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-          <Download className="w-4 h-4" />
-          Export CSV
+        <Button 
+          variant="secondary" 
+          className="gap-2 opacity-0 animate-fade-in" 
+          style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}
+          onClick={handleExportCSV}
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Exporting...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" />
+              Export CSV
+            </>
+          )}
         </Button>
       </div>
 
@@ -114,7 +194,7 @@ export default function History() {
               </div>
               
               <div className="space-y-2">
-                {activities.map((activity, index) => (
+                {activities.map((activity) => (
                   <Card 
                     key={activity.id}
                     className="p-4 hover:shadow-md transition-shadow group"
@@ -148,10 +228,20 @@ export default function History() {
                       </div>
                       
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(activity.id)}
+                        >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => handleDelete(activity.id)}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
