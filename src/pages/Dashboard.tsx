@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DailyScore } from '@/components/dashboard/DailyScore';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { WeeklyChart } from '@/components/dashboard/WeeklyChart';
@@ -6,12 +7,72 @@ import { ProgressBar } from '@/components/dashboard/ProgressBar';
 import { HeatMap } from '@/components/dashboard/HeatMap';
 import { RecentActivities } from '@/components/dashboard/RecentActivities';
 import { Recommendations } from '@/components/dashboard/Recommendations';
-import { mockWeeklySummary, mockUser } from '@/lib/mockData';
-import { Zap, TrendingDown, Target, Calendar } from 'lucide-react';
+import { mockWeeklySummary, mockUser, mockActivities } from '@/lib/mockData';
+import { Zap, TrendingDown, Target, Calendar, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 export default function Dashboard() {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
+
+  const handleDownloadReport = async () => {
+    setIsDownloading(true);
+    
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Generate report data
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        user: mockUser.name,
+        period: 'This Week',
+        summary: {
+          totalEmissions: mockWeeklySummary.totalEmissionKg,
+          averageDaily: mockWeeklySummary.averageDailyEmissionKg,
+          weeklyTarget: mockUser.weeklyTarget,
+          comparisonToPrevWeek: mockWeeklySummary.comparisonToPrevWeek,
+        },
+        activities: mockActivities.map(a => ({
+          date: format(new Date(a.datetime), 'yyyy-MM-dd'),
+          time: format(new Date(a.datetime), 'HH:mm'),
+          description: a.description,
+          category: a.category,
+          emissionKg: a.estimatedEmissionKgCo2,
+        })),
+        recommendations: mockWeeklySummary.recommendations,
+      };
+
+      // Create and download JSON file
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { 
+        type: 'application/json' 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `carbon-report-${format(new Date(), 'yyyy-MM-dd')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Report downloaded! 📊",
+        description: "Your weekly carbon report has been saved.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -24,9 +85,24 @@ export default function Dashboard() {
             Here's your carbon footprint overview for this week
           </p>
         </div>
-        <Button variant="hero" className="gap-2 opacity-0 animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-          <Download className="w-4 h-4" />
-          Download Report
+        <Button 
+          variant="hero" 
+          className="gap-2 opacity-0 animate-fade-in" 
+          style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}
+          onClick={handleDownloadReport}
+          disabled={isDownloading}
+        >
+          {isDownloading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" />
+              Download Report
+            </>
+          )}
         </Button>
       </div>
 
