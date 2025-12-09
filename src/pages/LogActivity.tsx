@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { yesterdayActivities } from '@/lib/mockData';
+import { useCarbonEmissions } from '@/hooks/useCarbonEmissions';
 import { CATEGORY_ICONS } from '@/types/carbon';
 import { Send, Sparkles, Clock, Copy, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -12,7 +11,15 @@ import { cn } from '@/lib/utils';
 export default function LogActivity() {
   const [activity, setActivity] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [recentlyAdded, setRecentlyAdded] = useState<string[]>([]);
+  const [recentlyAdded, setRecentlyAdded] = useState<{ description: string; category: string; emission: number }[]>([]);
+  
+  const { logActivity, calculateEmission, activities } = useCarbonEmissions();
+
+  // Get yesterday's activities for quick add
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yesterdayActivities = activities.filter(a => a.activity_date === yesterdayStr);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,25 +27,34 @@ export default function LogActivity() {
 
     setIsProcessing(true);
     
-    // Simulate AI processing
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Calculate emission using AI classification
+    const { category, emission } = calculateEmission(activity);
     
-    setRecentlyAdded(prev => [...prev, activity]);
-    toast({
-      title: "Activity logged! 🌱",
-      description: "AI classified: Transport - Car (~3.2 kg CO₂)",
-    });
+    // Log to database
+    const { error } = await logActivity(activity, category, emission);
+    
+    if (!error) {
+      setRecentlyAdded(prev => [...prev, { description: activity, category, emission }]);
+    }
     
     setActivity('');
     setIsProcessing(false);
   };
 
-  const useYesterdayActivity = (description: string) => {
-    setRecentlyAdded(prev => [...prev, description]);
-    toast({
-      title: "Activity cloned! ⚡",
-      description: `"${description}" added for today`,
-    });
+  const useYesterdayActivity = async (act: typeof activities[0]) => {
+    const { error } = await logActivity(act.description, act.category, Number(act.emission_kg));
+    
+    if (!error) {
+      setRecentlyAdded(prev => [...prev, { 
+        description: act.description, 
+        category: act.category, 
+        emission: Number(act.emission_kg) 
+      }]);
+      toast({
+        title: "Activity cloned! ⚡",
+        description: `"${act.description}" added for today`,
+      });
+    }
   };
 
   const suggestions = [
@@ -121,7 +137,9 @@ export default function LogActivity() {
             {recentlyAdded.slice(-3).reverse().map((item, index) => (
               <div key={index} className="flex items-center gap-3 p-2 rounded bg-background/50">
                 <span className="text-success">✓</span>
-                <span className="text-sm flex-1 truncate">{item}</span>
+                <span className="text-lg">{CATEGORY_ICONS[item.category] || '📦'}</span>
+                <span className="text-sm flex-1 truncate">{item.description}</span>
+                <span className="text-sm text-muted-foreground">{item.emission.toFixed(1)} kg</span>
               </div>
             ))}
           </div>
@@ -143,17 +161,17 @@ export default function LogActivity() {
                 key={act.id}
                 className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
               >
-                <span className="text-xl">{CATEGORY_ICONS[act.category]}</span>
+                <span className="text-xl">{CATEGORY_ICONS[act.category] || '📦'}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{act.description}</p>
                   <p className="text-xs text-muted-foreground">
-                    {act.estimatedEmissionKgCo2.toFixed(1)} kg CO₂
+                    {Number(act.emission_kg).toFixed(1)} kg CO₂
                   </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => useYesterdayActivity(act.description)}
+                  onClick={() => useYesterdayActivity(act)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <Copy className="w-4 h-4" />

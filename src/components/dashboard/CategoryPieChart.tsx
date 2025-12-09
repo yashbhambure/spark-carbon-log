@@ -1,17 +1,45 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { mockWeeklySummary } from '@/lib/mockData';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useCarbonEmissions } from '@/hooks/useCarbonEmissions';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/types/carbon';
-
-const data = mockWeeklySummary.topActivities.map(activity => ({
-  name: activity.category,
-  value: activity.totalEmission,
-  percentage: activity.percentage,
-  icon: CATEGORY_ICONS[activity.category],
-}));
 
 const COLORS = Object.values(CATEGORY_COLORS);
 
 export function CategoryPieChart() {
+  const { weeklySummary, loading } = useCarbonEmissions();
+
+  const data = weeklySummary.categoryBreakdown.map(activity => ({
+    name: activity.category,
+    value: activity.totalEmission,
+    percentage: activity.percentage,
+    icon: CATEGORY_ICONS[activity.category] || '📦',
+  }));
+
+  if (loading) {
+    return (
+      <div className="glass-card rounded-xl p-5 animate-pulse">
+        <div className="h-6 bg-muted rounded w-1/2 mb-4"></div>
+        <div className="h-52 bg-muted rounded"></div>
+      </div>
+    );
+  }
+
+  // Show empty state if no data
+  if (data.length === 0) {
+    return (
+      <div className="glass-card rounded-xl p-5 opacity-0 animate-slide-up" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
+        <h3 className="font-semibold text-lg mb-4">Emissions by Category</h3>
+        
+        <div className="h-52 flex items-center justify-center">
+          <div className="text-center text-muted-foreground">
+            <p className="text-4xl mb-2">📊</p>
+            <p className="text-sm">No emissions data yet</p>
+            <p className="text-xs">Log activities to see breakdown</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card rounded-xl p-5 opacity-0 animate-slide-up" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
       <h3 className="font-semibold text-lg mb-4">Emissions by Category</h3>

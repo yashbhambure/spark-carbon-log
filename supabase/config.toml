@@ -1,1 +1,4 @@
 project_id = "zygsdvuzikfexvrrvlvp"
+
+[functions.daily-reset]
+verify_jwt = false

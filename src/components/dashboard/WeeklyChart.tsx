@@ -1,9 +1,23 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from 'recharts';
-import { generateWeeklyData } from '@/lib/mockData';
-
-const data = generateWeeklyData();
+import { useCarbonEmissions } from '@/hooks/useCarbonEmissions';
+import { useAuth } from '@/hooks/useAuth';
 
 export function WeeklyChart() {
+  const { weeklySummary, loading } = useCarbonEmissions();
+  const { profile } = useAuth();
+  
+  const data = weeklySummary.dailyData;
+  const dailyTarget = (profile?.weekly_target || 50) / 7;
+
+  if (loading) {
+    return (
+      <div className="glass-card rounded-xl p-5 animate-pulse">
+        <div className="h-6 bg-muted rounded w-1/4 mb-4"></div>
+        <div className="h-64 bg-muted rounded"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card rounded-xl p-5 opacity-0 animate-slide-up" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
       <div className="flex items-center justify-between mb-4">
@@ -57,7 +71,7 @@ export function WeeklyChart() {
               labelStyle={{ fontWeight: 600 }}
             />
             <ReferenceLine 
-              y={7} 
+              y={dailyTarget} 
               stroke="hsl(var(--accent))" 
               strokeDasharray="5 5" 
               strokeWidth={2}
