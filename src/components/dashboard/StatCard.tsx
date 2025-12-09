@@ -9,9 +9,10 @@ interface StatCardProps {
   icon?: React.ReactNode;
   className?: string;
   delay?: number;
+  loading?: boolean;
 }
 
-export function StatCard({ title, value, unit, change, icon, className, delay = 0 }: StatCardProps) {
+export function StatCard({ title, value, unit, change, icon, className, delay = 0, loading }: StatCardProps) {
   const getChangeColor = () => {
     if (change === undefined || change === 0) return 'text-muted-foreground';
     return change < 0 ? 'text-success' : 'text-destructive';
@@ -28,6 +29,15 @@ export function StatCard({ title, value, unit, change, icon, className, delay = 
     if (change > 5) return '🔴';
     return '🟡';
   };
+
+  if (loading) {
+    return (
+      <div className={cn("glass-card rounded-xl p-5 animate-pulse", className)}>
+        <div className="h-4 bg-muted rounded w-1/2 mb-3"></div>
+        <div className="h-8 bg-muted rounded w-1/3"></div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -56,7 +66,7 @@ export function StatCard({ title, value, unit, change, icon, className, delay = 
         <div className={cn("flex items-center gap-1 mt-3 text-sm font-medium", getChangeColor())}>
           <span className="flex items-center gap-0.5">
             {getChangeIcon()}
-            {Math.abs(change).toFixed(1)}%
+            {change > 0 ? '+' : ''}{Math.abs(change).toFixed(1)}%
           </span>
           <span className="text-muted-foreground">vs last week</span>
           <span className="ml-auto text-lg">{getEmoji()}</span>

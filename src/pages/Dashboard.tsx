@@ -7,8 +7,8 @@ import { ProgressBar } from '@/components/dashboard/ProgressBar';
 import { HeatMap } from '@/components/dashboard/HeatMap';
 import { RecentActivities } from '@/components/dashboard/RecentActivities';
 import { Recommendations } from '@/components/dashboard/Recommendations';
-import { mockWeeklySummary, mockActivities } from '@/lib/mockData';
 import { useAuth } from '@/hooks/useAuth';
+import { useCarbonEmissions } from '@/hooks/useCarbonEmissions';
 import { Zap, TrendingDown, Target, Calendar, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -18,8 +18,8 @@ export default function Dashboard() {
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
   const { profile } = useAuth();
+  const { weeklySummary, activities, loading } = useCarbonEmissions();
 
-  // Get user's first name from profile, fallback to 'there'
   const firstName = profile?.name?.split(' ')[0] || 'there';
 
   const handleDownloadReport = async () => {
@@ -116,26 +116,27 @@ export default function Dashboard() {
         <DailyScore />
         <StatCard
           title="Weekly Total"
-          value={mockWeeklySummary.totalEmissionKg.toFixed(1)}
+          value={weeklySummary.totalEmissionKg.toFixed(1)}
           unit="kg CO₂"
-          change={mockWeeklySummary.comparisonToPrevWeek}
+          change={weeklySummary.comparisonToPrevWeek}
           icon={<Calendar className="w-5 h-5" />}
           delay={100}
+          loading={loading}
         />
         <StatCard
           title="Daily Average"
-          value={mockWeeklySummary.averageDailyEmissionKg.toFixed(1)}
+          value={weeklySummary.averageDailyEmissionKg.toFixed(1)}
           unit="kg CO₂"
-          change={-5.2}
           icon={<TrendingDown className="w-5 h-5" />}
           delay={150}
+          loading={loading}
         />
         <StatCard
           title="Activities Logged"
-          value={12}
-          change={15}
+          value={weeklySummary.activityCount}
           icon={<Zap className="w-5 h-5" />}
           delay={200}
+          loading={loading}
         />
       </div>
 

@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          activity_date: string
+          category: string
+          created_at: string
+          description: string
+          emission_kg: number
+          id: string
+          user_id: string
+        }
+        Insert: {
+          activity_date?: string
+          category: string
+          created_at?: string
+          description: string
+          emission_kg?: number
+          id?: string
+          user_id: string
+        }
+        Update: {
+          activity_date?: string
+          category?: string
+          created_at?: string
+          description?: string
+          emission_kg?: number
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_history: {
+        Row: {
+          activity_count: number
+          created_at: string
+          date: string
+          id: string
+          total_emission_kg: number
+          user_id: string
+        }
+        Insert: {
+          activity_count?: number
+          created_at?: string
+          date: string
+          id?: string
+          total_emission_kg?: number
+          user_id: string
+        }
+        Update: {
+          activity_count?: number
+          created_at?: string
+          date?: string
+          id?: string
+          total_emission_kg?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
