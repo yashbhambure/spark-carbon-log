@@ -35,19 +35,19 @@ export default function Dashboard() {
         user: profile?.name || 'User',
         period: 'This Week',
         summary: {
-          totalEmissions: mockWeeklySummary.totalEmissionKg,
-          averageDaily: mockWeeklySummary.averageDailyEmissionKg,
+          totalEmissions: weeklySummary.totalEmissionKg,
+          averageDaily: weeklySummary.averageDailyEmissionKg,
           weeklyTarget: profile?.weekly_target || 50,
-          comparisonToPrevWeek: mockWeeklySummary.comparisonToPrevWeek,
+          comparisonToPrevWeek: weeklySummary.comparisonToPrevWeek,
         },
-        activities: mockActivities.map(a => ({
-          date: format(new Date(a.datetime), 'yyyy-MM-dd'),
-          time: format(new Date(a.datetime), 'HH:mm'),
+        activities: activities.map(a => ({
+          date: a.activity_date,
+          time: format(new Date(a.created_at), 'HH:mm'),
           description: a.description,
           category: a.category,
-          emissionKg: a.estimatedEmissionKgCo2,
+          emissionKg: Number(a.emission_kg),
         })),
-        recommendations: mockWeeklySummary.recommendations,
+        categoryBreakdown: weeklySummary.categoryBreakdown,
       };
 
       // Create and download JSON file
