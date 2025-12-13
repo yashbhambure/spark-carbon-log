@@ -74,7 +74,7 @@ export default function Index() {
                   <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
-              <Link to="/dashboard">
+              <Link to="/demo">
                 <Button variant="outline" size="lg">
                   View Demo Dashboard
                 </Button>

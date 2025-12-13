@@ -9,6 +9,7 @@ import { CarbonProvider } from "@/hooks/useCarbonEmissions";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import DemoDashboard from "./pages/DemoDashboard";
 import LogActivity from "./pages/LogActivity";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
@@ -27,6 +28,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/demo" element={<DemoDashboard />} />
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/log" element={<LogActivity />} />
