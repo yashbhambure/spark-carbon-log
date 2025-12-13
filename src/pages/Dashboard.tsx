@@ -9,10 +9,17 @@ import { RecentActivities } from '@/components/dashboard/RecentActivities';
 import { Recommendations } from '@/components/dashboard/Recommendations';
 import { useAuth } from '@/hooks/useAuth';
 import { useCarbonEmissions } from '@/hooks/useCarbonEmissions';
-import { Zap, TrendingDown, Target, Calendar, Download, Loader2 } from 'lucide-react';
+import { Zap, TrendingDown, Target, Calendar, Download, Loader2, FileSpreadsheet, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import * as XLSX from 'xlsx';
 
 export default function Dashboard() {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -22,50 +29,141 @@ export default function Dashboard() {
 
   const firstName = profile?.name?.split(' ')[0] || 'there';
 
-  const handleDownloadReport = async () => {
+  const generateReportData = () => {
+    // Create structured tabular data
+    const reportRows = activities.map(a => ({
+      Date: a.activity_date,
+      Time: format(new Date(a.created_at), 'HH:mm'),
+      'Activity Name': a.description,
+      Category: a.category.charAt(0).toUpperCase() + a.category.slice(1),
+      'Carbon Emissions (kg CO₂)': Number(a.emission_kg).toFixed(2),
+    }));
+
+    // Add summary row
+    const summaryData = {
+      'Report Generated': format(new Date(), 'yyyy-MM-dd HH:mm'),
+      'User': profile?.name || 'User',
+      'Period': 'This Week',
+      'Total Emissions (kg CO₂)': weeklySummary.totalEmissionKg.toFixed(2),
+      'Daily Average (kg CO₂)': weeklySummary.averageDailyEmissionKg.toFixed(2),
+      'Weekly Target (kg CO₂)': profile?.weekly_target || 50,
+      'Change vs Previous Week': `${weeklySummary.comparisonToPrevWeek >= 0 ? '+' : ''}${weeklySummary.comparisonToPrevWeek.toFixed(1)}%`,
+      'Activities Logged': weeklySummary.activityCount,
+    };
+
+    return { reportRows, summaryData };
+  };
+
+  const handleDownloadCSV = async () => {
     setIsDownloading(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Generate report data
-      const reportData = {
-        generatedAt: new Date().toISOString(),
-        user: profile?.name || 'User',
-        period: 'This Week',
-        summary: {
-          totalEmissions: weeklySummary.totalEmissionKg,
-          averageDaily: weeklySummary.averageDailyEmissionKg,
-          weeklyTarget: profile?.weekly_target || 50,
-          comparisonToPrevWeek: weeklySummary.comparisonToPrevWeek,
-        },
-        activities: activities.map(a => ({
-          date: a.activity_date,
-          time: format(new Date(a.created_at), 'HH:mm'),
-          description: a.description,
-          category: a.category,
-          emissionKg: Number(a.emission_kg),
-        })),
-        categoryBreakdown: weeklySummary.categoryBreakdown,
-      };
-
-      // Create and download JSON file
-      const blob = new Blob([JSON.stringify(reportData, null, 2)], { 
-        type: 'application/json' 
+      const { reportRows, summaryData } = generateReportData();
+      
+      // Build CSV content
+      let csvContent = '';
+      
+      // Add summary section
+      csvContent += 'CARBON FOOTPRINT REPORT SUMMARY\n';
+      Object.entries(summaryData).forEach(([key, value]) => {
+        csvContent += `${key},${value}\n`;
       });
+      csvContent += '\n';
+      
+      // Add activities section
+      if (reportRows.length > 0) {
+        csvContent += 'ACTIVITY DETAILS\n';
+        const headers = Object.keys(reportRows[0]);
+        csvContent += headers.join(',') + '\n';
+        
+        reportRows.forEach(row => {
+          const values = headers.map(header => {
+            const value = row[header as keyof typeof row];
+            // Escape values containing commas or quotes
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          });
+          csvContent += values.join(',') + '\n';
+        });
+      } else {
+        csvContent += 'No activities logged this week.\n';
+      }
+
+      // Create and download CSV file
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `carbon-report-${format(new Date(), 'yyyy-MM-dd')}.json`;
+      link.download = `carbon_report_${format(new Date(), 'yyyy-MM-dd')}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
       toast({
-        title: "Report downloaded! 📊",
-        description: "Your weekly carbon report has been saved.",
+        title: "Report downloaded successfully!",
+        description: "Your carbon footprint report has been downloaded successfully in CSV format.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    setIsDownloading(true);
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { reportRows, summaryData } = generateReportData();
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Create summary sheet data
+      const summarySheetData = [
+        ['CARBON FOOTPRINT REPORT'],
+        [],
+        ...Object.entries(summaryData).map(([key, value]) => [key, value]),
+      ];
+      
+      // Create activities sheet data
+      const activitiesSheetData = reportRows.length > 0 
+        ? [Object.keys(reportRows[0]), ...reportRows.map(row => Object.values(row))]
+        : [['No activities logged this week.']];
+      
+      // Add Summary sheet
+      const summaryWs = XLSX.utils.aoa_to_sheet(summarySheetData);
+      summaryWs['!cols'] = [{ wch: 25 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+      
+      // Add Carbon Report sheet with activities
+      const activitiesWs = XLSX.utils.aoa_to_sheet(activitiesSheetData);
+      activitiesWs['!cols'] = [
+        { wch: 12 }, // Date
+        { wch: 8 },  // Time
+        { wch: 40 }, // Activity Name
+        { wch: 15 }, // Category
+        { wch: 22 }, // Carbon Emissions
+      ];
+      XLSX.utils.book_append_sheet(wb, activitiesWs, 'Carbon Report');
+
+      // Generate and download Excel file
+      XLSX.writeFile(wb, `carbon_report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+
+      toast({
+        title: "Report downloaded successfully!",
+        description: "Your carbon footprint report has been downloaded successfully in Excel format.",
       });
     } catch (error) {
       toast({
@@ -90,25 +188,38 @@ export default function Dashboard() {
             Here's your carbon footprint overview for this week
           </p>
         </div>
-        <Button 
-          variant="hero" 
-          className="gap-2 opacity-0 animate-fade-in" 
-          style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}
-          onClick={handleDownloadReport}
-          disabled={isDownloading}
-        >
-          {isDownloading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Download className="w-4 h-4" />
-              Download Report
-            </>
-          )}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="hero" 
+              className="gap-2 opacity-0 animate-fade-in" 
+              style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Download Report
+                </>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleDownloadCSV} className="gap-2 cursor-pointer">
+              <FileText className="w-4 h-4" />
+              Download as CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownloadExcel} className="gap-2 cursor-pointer">
+              <FileSpreadsheet className="w-4 h-4" />
+              Download as Excel
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Stats Grid */}
