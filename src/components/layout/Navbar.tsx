@@ -40,7 +40,7 @@ export function Navbar() {
             <div className="p-2 rounded-lg gradient-primary transition-transform group-hover:scale-110">
               <Leaf className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-bold text-xl">CarbonTrack</span>
+            <span className="font-bold text-xl">EcoTrace</span>
           </Link>
 
           {/* Desktop Navigation */}
