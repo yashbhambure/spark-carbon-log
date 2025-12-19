@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { mockActivities } from '@/lib/mockData';
 import { CATEGORY_ICONS, CATEGORY_COLORS } from '@/types/carbon';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -7,46 +6,75 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Calendar, Download, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useCarbonEmissions } from '@/hooks/useCarbonEmissions';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function History() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<any>(null);
+  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+  const { activities, deleteActivity, refreshData } = useCarbonEmissions();
 
   const categories = ['transport', 'food', 'energy', 'waste', 'shopping', 'other'];
 
-  const filteredActivities = mockActivities.filter(activity => {
+  const filteredActivities = activities.filter(activity => {
     const matchesSearch = activity.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !selectedCategory || activity.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const groupedByDate = filteredActivities.reduce((acc, activity) => {
-    const date = format(new Date(activity.datetime), 'yyyy-MM-dd');
+    const date = format(new Date(activity.activity_date), 'yyyy-MM-dd');
     if (!acc[date]) acc[date] = [];
     acc[date].push(activity);
     return acc;
-  }, {} as Record<string, typeof mockActivities>);
+  }, {} as Record<string, typeof activities>);
 
-  const totalEmissions = filteredActivities.reduce((sum, a) => sum + a.estimatedEmissionKgCo2, 0);
+  const totalEmissions = filteredActivities.reduce((sum, a) => sum + Number(a.emission_kg), 0);
 
   const handleExportCSV = async () => {
     setIsExporting(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Generate CSV content
-      const headers = ['Date', 'Time', 'Description', 'Category', 'Emission (kg CO₂)', 'Source'];
+      const headers = ['Date', 'Description', 'Category', 'Emission (kg CO₂)'];
       const rows = filteredActivities.map(activity => [
-        format(new Date(activity.datetime), 'yyyy-MM-dd'),
-        format(new Date(activity.datetime), 'HH:mm'),
+        format(new Date(activity.activity_date), 'yyyy-MM-dd'),
         `"${activity.description.replace(/"/g, '""')}"`,
         activity.category,
-        activity.estimatedEmissionKgCo2.toFixed(2),
-        activity.source,
+        Number(activity.emission_kg).toFixed(2),
       ]);
 
       const csvContent = [
@@ -54,7 +82,6 @@ export default function History() {
         ...rows.map(row => row.join(','))
       ].join('\n');
 
-      // Create and download CSV file
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -66,7 +93,7 @@ export default function History() {
       URL.revokeObjectURL(url);
 
       toast({
-        title: "CSV exported! 📁",
+        title: "CSV exported!",
         description: `Exported ${filteredActivities.length} activities to CSV.`,
       });
     } catch (error) {
@@ -80,19 +107,69 @@ export default function History() {
     }
   };
 
-  const handleEdit = (activityId: string) => {
-    toast({
-      title: "Edit activity",
-      description: "Activity editing will be available when the backend is connected.",
-    });
+  const handleEdit = (activity: any) => {
+    setEditingActivity(activity);
+    setEditDescription(activity.description);
+    setEditCategory(activity.category);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingActivity) return;
+    
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('activities')
+        .update({
+          description: editDescription,
+          category: editCategory,
+        })
+        .eq('id', editingActivity.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Activity updated",
+        description: "Your activity has been updated successfully.",
+      });
+      
+      setEditingActivity(null);
+      refreshData();
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: "There was an error updating your activity. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleDelete = (activityId: string) => {
-    toast({
-      title: "Delete activity",
-      description: "Activity deletion will be available when the backend is connected.",
-      variant: "destructive",
-    });
+    setDeletingActivityId(activityId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingActivityId) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteActivity(deletingActivityId);
+      toast({
+        title: "Activity deleted",
+        description: "Your activity has been deleted successfully.",
+      });
+      setDeletingActivityId(null);
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: "There was an error deleting your activity. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -177,7 +254,7 @@ export default function History() {
       <div className="space-y-6">
         {Object.entries(groupedByDate)
           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-          .map(([date, activities], groupIndex) => (
+          .map(([date, dateActivities], groupIndex) => (
             <div 
               key={date}
               className="opacity-0 animate-slide-up"
@@ -189,12 +266,12 @@ export default function History() {
                   {format(new Date(date), 'EEEE, MMMM d, yyyy')}
                 </h3>
                 <span className="text-sm text-muted-foreground">
-                  ({activities.reduce((sum, a) => sum + a.estimatedEmissionKgCo2, 0).toFixed(1)} kg)
+                  ({dateActivities.reduce((sum, a) => sum + Number(a.emission_kg), 0).toFixed(1)} kg)
                 </span>
               </div>
               
               <div className="space-y-2">
-                {activities.map((activity) => (
+                {dateActivities.map((activity) => (
                   <Card 
                     key={activity.id}
                     className="p-4 hover:shadow-md transition-shadow group"
@@ -212,18 +289,12 @@ export default function History() {
                         <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                           <span className="capitalize">{activity.category}</span>
                           <span>•</span>
-                          <span>{format(new Date(activity.datetime), 'h:mm a')}</span>
-                          {activity.source === 'gemini' && (
-                            <>
-                              <span>•</span>
-                              <span className="text-primary">AI classified</span>
-                            </>
-                          )}
+                          <span>{format(new Date(activity.created_at), 'h:mm a')}</span>
                         </div>
                       </div>
                       
                       <div className="text-right">
-                        <p className="font-bold text-lg">{activity.estimatedEmissionKgCo2.toFixed(1)}</p>
+                        <p className="font-bold text-lg">{Number(activity.emission_kg).toFixed(1)}</p>
                         <p className="text-xs text-muted-foreground">kg CO₂</p>
                       </div>
                       
@@ -232,7 +303,7 @@ export default function History() {
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8"
-                          onClick={() => handleEdit(activity.id)}
+                          onClick={() => handleEdit(activity)}
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -258,6 +329,83 @@ export default function History() {
           <p className="text-muted-foreground">No activities found matching your filters.</p>
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingActivity} onOpenChange={(open) => !open && setEditingActivity(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Activity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Input
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Activity description"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <Select value={editCategory} onValueChange={setEditCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      <span className="flex items-center gap-2">
+                        <span>{CATEGORY_ICONS[cat]}</span>
+                        <span className="capitalize">{cat}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingActivity(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isUpdating}>
+              {isUpdating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingActivityId} onOpenChange={(open) => !open && setDeletingActivityId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this activity? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
