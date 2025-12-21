@@ -44,7 +44,7 @@ export default function History() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
-  const { activities, deleteActivity, refreshData } = useCarbonEmissions();
+  const { activities, deleteActivity, refreshData, calculateEmission } = useCarbonEmissions();
 
   const categories = ['transport', 'food', 'energy', 'waste', 'shopping', 'other'];
 
@@ -118,23 +118,29 @@ export default function History() {
     
     setIsUpdating(true);
     try {
+      // Recalculate emission based on updated description
+      const { emission } = calculateEmission(editDescription);
+      
       const { error } = await supabase
         .from('activities')
         .update({
           description: editDescription,
           category: editCategory,
+          emission_kg: emission,
         })
         .eq('id', editingActivity.id);
 
       if (error) throw error;
 
+      // Force refresh data to update dashboard
+      await refreshData();
+
       toast({
         title: "Activity updated",
-        description: "Your activity has been updated successfully.",
+        description: `Emission recalculated to ${emission.toFixed(1)} kg CO₂`,
       });
       
       setEditingActivity(null);
-      refreshData();
     } catch (error) {
       toast({
         title: "Update failed",
